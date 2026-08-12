@@ -1,0 +1,16 @@
+[Unit]
+Description=Transport Kiosk Hardware Interface
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/transport-app
+ExecStart=/bin/bash /home/pi/transport-app/hardware/launch_app.sh
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
