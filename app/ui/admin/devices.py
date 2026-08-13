@@ -15,6 +15,9 @@ from app.services.devices import (
 
 logger = logging.getLogger(__name__)
 
+# Allowed status options across device management
+STATUS_OPTIONS = ['Active', 'Online', 'Offline', 'Maintenance', 'Inactive']
+
 
 def render_admin_devices_page():
     """
@@ -91,7 +94,14 @@ def render_admin_devices_page():
                         d_loc = device.get('formatted_location', 'Location Unavailable')
                         
                         bus_str = f"Bus #{d_bus}" if str(d_bus).isdigit() else str(d_bus)
-                        status_bg = 'bg-green-100 text-green-800' if d_status == 'Active' else 'bg-amber-100 text-amber-800'
+                        
+                        # Dynamic badge styling based on status
+                        if d_status in ['Active', 'Online']:
+                            status_bg = 'bg-green-100 text-green-800'
+                        elif d_status == 'Maintenance':
+                            status_bg = 'bg-amber-100 text-amber-800'
+                        else:
+                            status_bg = 'bg-slate-200 text-slate-700'
 
                         # -------------------------------------------------
                         # A. MOBILE VIEW: Touch-Friendly Cards (Phone screens)
@@ -188,7 +198,7 @@ def render_admin_devices_page():
                             bus_input = ui.input('Assigned Bus #', placeholder='e.g., 104').props('dense outlined').classes('w-full text-xs')
                             model_input = ui.input('Device Model', value='In-Vehicle Telematics Unit').props('dense outlined').classes('w-full text-xs')
                             location_input = ui.input('Initial Depot / Location', value='Bulloch County Bus Garage, Statesboro, GA').props('dense outlined').classes('w-full text-xs')
-                            status_select = ui.select(['Active', 'Maintenance', 'Inactive'], value='Active', label='Status').props('dense outlined').classes('w-full text-xs')
+                            status_select = ui.select(STATUS_OPTIONS, value='Active', label='Status').props('dense outlined').classes('w-full text-xs')
 
                             def save_manual_device():
                                 sn = serial_input.value.strip()
@@ -229,7 +239,11 @@ def render_admin_devices_page():
                     edit_bus = ui.input('Assigned Bus #', value=str(device.get('assigned_bus') or device.get('bus_number', ''))).props('dense outlined').classes('w-full text-xs')
                     edit_model = ui.input('Device Model', value=device.get('model', '')).props('dense outlined').classes('w-full text-xs')
                     edit_location = ui.input('Current Location / Depot', value=device.get('formatted_location', '')).props('dense outlined').classes('w-full text-xs')
-                    edit_status = ui.select(['Active', 'Maintenance', 'Inactive'], value=device.get('status', 'Active').capitalize(), label='Status').props('dense outlined').classes('w-full text-xs')
+                    
+                    # Safe fallback logic to prevent NiceGUI ValueError
+                    raw_status = str(device.get('status', 'Active')).capitalize()
+                    initial_status = raw_status if raw_status in STATUS_OPTIONS else 'Active'
+                    edit_status = ui.select(STATUS_OPTIONS, value=initial_status, label='Status').props('dense outlined').classes('w-full text-xs')
 
                     def save_device_changes():
                         payload = {
