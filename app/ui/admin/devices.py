@@ -18,46 +18,46 @@ logger = logging.getLogger(__name__)
 
 def render_admin_devices_page():
     """
-    Admin Management Console optimized for 1024x600 touchscreen displays.
+    Admin Management Console optimized for mobile phones, touch tablets, and desktops.
     """
     # Shared Header Navigation
     render_admin_header(active_page="devices")
 
-    # Fixed Viewport Container (1024x600 Screen Optimization)
-    with ui.column().classes('w-full max-w-[1024px] h-[540px] p-3 bg-slate-100 gap-2 overflow-hidden mx-auto'):
+    # Responsive Outer Container (Fluid width and auto-height for phones)
+    with ui.column().classes('w-full max-w-6xl min-h-[calc(100vh-80px)] p-2 md:p-4 bg-slate-100 gap-3 mx-auto'):
         
-        with ui.card().classes('w-full h-full bg-white p-3 rounded-xl shadow border border-slate-200 flex flex-col gap-2 overflow-hidden'):
+        with ui.card().classes('w-full bg-white p-3 md:p-5 rounded-xl shadow border border-slate-200 flex flex-col gap-3'):
             
             # -------------------------------------------------------------
             # 1. COMPACT ACTION HEADER
             # -------------------------------------------------------------
-            with ui.row().classes('w-full justify-between items-center h-9'):
+            with ui.row().classes('w-full justify-between items-center gap-2'):
                 with ui.column().classes('gap-0'):
-                    ui.label('Hardware Device Management').classes('text-base font-bold text-slate-800 leading-tight')
-                    ui.label('Manage telematics units and generate 6-digit activation codes').classes('text-[10px] text-slate-500')
+                    ui.label('Hardware Device Management').classes('text-base md:text-lg font-bold text-slate-800 leading-tight')
+                    ui.label('Manage telematics units and generate activation codes').classes('text-[11px] text-slate-500')
 
-                with ui.row().classes('gap-2'):
+                with ui.row().classes('gap-2 items-center'):
                     ui.button('+ Code / Device', on_click=lambda: open_add_dialog()).classes(
-                        'bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 text-xs rounded-lg shadow h-8'
+                        'bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow'
                     )
                     ui.button('↻ Refresh', on_click=lambda: refresh_list(search_input.value)).classes(
-                        'bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1 text-xs rounded-lg shadow h-8'
+                        'bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow'
                     )
 
             # -------------------------------------------------------------
             # 2. COMPACT SEARCH BAR
             # -------------------------------------------------------------
-            with ui.row().classes('w-full gap-2 items-center h-8'):
+            with ui.row().classes('w-full gap-2 items-center'):
                 search_input = ui.input(
                     placeholder='Search Serial, Bus #, Code, Model...'
-                ).props('outlined dense icon=search').classes('flex-1 text-xs h-8')
+                ).props('outlined dense icon=search').classes('flex-1 text-xs')
                 
-                ui.button('Clear', on_click=lambda: clear_search()).props('outline color=grey dense').classes('h-8 text-xs')
+                ui.button('Clear', on_click=lambda: clear_search()).props('outline color=grey dense').classes('text-xs')
 
             # -------------------------------------------------------------
-            # 3. SCROLLABLE DIRECTORY TABLE AREA
+            # 3. DIRECTORY CONTAINER (Card Stack on Mobile / Table on Desktop)
             # -------------------------------------------------------------
-            devices_container = ui.column().classes('w-full flex-1 gap-1 overflow-y-auto pr-1')
+            devices_container = ui.column().classes('w-full flex-1 gap-2 overflow-y-auto pr-1')
 
             def refresh_list(query: str = ""):
                 devices_container.clear()
@@ -65,14 +65,14 @@ def render_admin_devices_page():
 
                 if not records:
                     with devices_container:
-                        with ui.card().classes('w-full p-4 text-center bg-slate-50 border border-slate-200 rounded-lg'):
-                            ui.icon('developer_board_off', size='32px').classes('text-slate-300 mb-1')
+                        with ui.card().classes('w-full p-6 text-center bg-slate-50 border border-slate-200 rounded-lg'):
+                            ui.icon('developer_board_off', size='36px').classes('text-slate-300 mb-1')
                             ui.label('No registered hardware devices found.').classes('text-slate-500 text-xs font-medium')
                     return
 
-                # Table Header
+                # Desktop Table Header (Hidden on Mobile)
                 with devices_container:
-                    with ui.row().classes('w-full px-3 py-1.5 bg-slate-800 text-white font-bold text-[11px] rounded-md justify-between items-center shadow-sm'):
+                    with ui.row().classes('w-full px-3 py-2 bg-slate-800 text-white font-bold text-[11px] rounded-md justify-between items-center shadow-sm gt-sm'):
                         ui.label('SERIAL NUMBER / MODEL').classes('w-1/4')
                         ui.label('STATUS').classes('w-1/12 text-center')
                         ui.label('ASSIGNED BUS').classes('w-1/6 text-center')
@@ -80,7 +80,7 @@ def render_admin_devices_page():
                         ui.label('LOCATION / BASE').classes('w-1/4')
                         ui.label('ACTIONS').classes('w-1/12 text-right')
 
-                    # Table Data Rows
+                    # Device List Renderer
                     for device in records:
                         d_id = device.get('id', '')
                         d_serial = device.get('serial_number', 'N/A')
@@ -89,8 +89,37 @@ def render_admin_devices_page():
                         d_bus = device.get('assigned_bus') or device.get('bus_number', 'Unassigned')
                         d_code = device.get('activation_code', 'N/A')
                         d_loc = device.get('formatted_location', 'Location Unavailable')
+                        
+                        bus_str = f"Bus #{d_bus}" if str(d_bus).isdigit() else str(d_bus)
+                        status_bg = 'bg-green-100 text-green-800' if d_status == 'Active' else 'bg-amber-100 text-amber-800'
 
-                        with ui.row().classes('w-full px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 justify-between items-center hover:bg-slate-100 rounded-md transition-colors'):
+                        # -------------------------------------------------
+                        # A. MOBILE VIEW: Touch-Friendly Cards (Phone screens)
+                        # -------------------------------------------------
+                        with ui.card().classes('w-full p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 lt-md shadow-sm'):
+                            with ui.row().classes('justify-between items-start w-full'):
+                                with ui.column().classes('gap-0'):
+                                    ui.label(d_serial).classes('font-mono font-bold text-slate-900 text-sm')
+                                    ui.label(d_model).classes('text-xs text-slate-500')
+                                
+                                ui.label(d_status).classes(f'text-[10px] font-bold px-2 py-0.5 rounded-full {status_bg}')
+
+                            with ui.row().classes('w-full justify-between items-center bg-white p-2 rounded-lg border border-slate-200/60 text-xs'):
+                                ui.label(f"Bus: {bus_str}").classes('font-semibold text-slate-700')
+                                ui.label(f"Code: {d_code}").classes('font-mono font-bold text-emerald-600')
+
+                            with ui.row().classes('items-center gap-1 text-slate-600 text-xs'):
+                                ui.icon('router', size='16px').classes('text-blue-500')
+                                ui.label(d_loc).classes('truncate font-medium')
+
+                            with ui.row().classes('w-full justify-end gap-2 pt-1 border-t border-slate-200'):
+                                ui.button('Edit', icon='edit', on_click=lambda d=device: open_edit_dialog(d)).props('dense flat color=blue size=sm')
+                                ui.button('Delete', icon='delete', on_click=lambda did=d_id, sn=d_serial: open_delete_dialog(did, sn)).props('dense flat color=red size=sm')
+
+                        # -------------------------------------------------
+                        # B. DESKTOP VIEW: Structured Table Row (Medium+ screens)
+                        # -------------------------------------------------
+                        with ui.row().classes('w-full px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 justify-between items-center hover:bg-slate-100 rounded-md transition-colors gt-sm'):
                             
                             # Serial & Model
                             with ui.column().classes('w-1/4 gap-0'):
@@ -98,11 +127,9 @@ def render_admin_devices_page():
                                 ui.label(d_model).classes('text-[10px] text-slate-500 truncate')
 
                             # Status Tag
-                            status_bg = 'bg-green-100 text-green-800' if d_status == 'Active' else 'bg-amber-100 text-amber-800'
                             ui.label(d_status).classes(f'w-1/12 text-[10px] font-bold px-1 py-0.5 rounded-full text-center {status_bg}')
 
                             # Assigned Bus
-                            bus_str = f"Bus #{d_bus}" if str(d_bus).isdigit() else str(d_bus)
                             ui.label(bus_str).classes('w-1/6 font-semibold text-slate-700 text-center')
 
                             # Activation Code
@@ -122,7 +149,7 @@ def render_admin_devices_page():
             # DIALOG: REGISTER DEVICE OR GENERATE 6-DIGIT CODE
             # -------------------------------------------------------------
             def open_add_dialog():
-                with ui.dialog() as dialog, ui.card().classes('w-[420px] max-h-[500px] p-4 flex flex-col gap-3 rounded-xl shadow-xl overflow-y-auto'):
+                with ui.dialog() as dialog, ui.card().classes('w-full max-w-[420px] max-h-[85vh] p-4 flex flex-col gap-3 rounded-xl shadow-xl overflow-y-auto mx-2'):
                     ui.label('Hardware Registration Options').classes('text-base font-bold text-slate-800')
 
                     with ui.tabs().classes('w-full dense') as tabs:
@@ -133,7 +160,7 @@ def render_admin_devices_page():
                         
                         # Panel 1: Code Generator
                         with ui.tab_panel(tab_code).classes('flex flex-col gap-2 p-1'):
-                            ui.label('Create a 1-year activation code for bus tablet.').classes('text-[11px] text-slate-500')
+                            ui.label('Create an activation code for bus tablet.').classes('text-[11px] text-slate-500')
                             
                             code_bus_input = ui.input('Assigned Bus Number *', placeholder='e.g., 104').props('dense outlined').classes('w-full text-xs')
                             generated_code_display = ui.label('').classes('text-2xl font-mono font-bold text-center text-emerald-600 my-1 hidden')
@@ -153,7 +180,7 @@ def render_admin_devices_page():
                                 else:
                                     ui.notify('Failed to generate code.', type='negative')
 
-                            ui.button('Generate 6-Digit Code', on_click=handle_generate_code).classes('w-full bg-emerald-600 text-white font-bold py-1.5 text-xs rounded-lg mt-1')
+                            ui.button('Generate 6-Digit Code', on_click=handle_generate_code).classes('w-full bg-emerald-600 text-white font-bold py-2 text-xs rounded-lg mt-1')
 
                         # Panel 2: Manual Device Entry
                         with ui.tab_panel(tab_manual).classes('flex flex-col gap-2 p-1'):
@@ -184,7 +211,7 @@ def render_admin_devices_page():
                                 else:
                                     ui.notify('Failed to create device.', type='negative')
 
-                            ui.button('Register Device Directly', on_click=save_manual_device).classes('w-full bg-blue-600 text-white font-bold py-1.5 text-xs rounded-lg mt-1')
+                            ui.button('Register Device Directly', on_click=save_manual_device).classes('w-full bg-blue-600 text-white font-bold py-2 text-xs rounded-lg mt-1')
 
                     with ui.row().classes('w-full justify-end mt-1'):
                         ui.button('Close', on_click=dialog.close).props('flat text-color=grey dense')
@@ -195,7 +222,7 @@ def render_admin_devices_page():
             # DIALOG: EDIT DEVICE
             # -------------------------------------------------------------
             def open_edit_dialog(device: dict):
-                with ui.dialog() as dialog, ui.card().classes('w-[380px] max-h-[500px] p-4 flex flex-col gap-2 rounded-xl shadow-xl overflow-y-auto'):
+                with ui.dialog() as dialog, ui.card().classes('w-full max-w-[380px] max-h-[85vh] p-4 flex flex-col gap-2 rounded-xl shadow-xl overflow-y-auto mx-2'):
                     ui.label('Edit Device Record').classes('text-base font-bold text-slate-800')
 
                     edit_serial = ui.input('Serial Number', value=device.get('serial_number', '')).props('dense outlined').classes('w-full text-xs')
@@ -222,7 +249,7 @@ def render_admin_devices_page():
 
                     with ui.row().classes('w-full justify-end gap-2 mt-2'):
                         ui.button('Cancel', on_click=dialog.close).props('flat text-color=grey dense')
-                        ui.button('Save Changes', on_click=save_device_changes).classes('bg-blue-600 text-white font-bold text-xs px-3 py-1 rounded')
+                        ui.button('Save Changes', on_click=save_device_changes).classes('bg-blue-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg')
 
                 dialog.open()
 
@@ -230,7 +257,7 @@ def render_admin_devices_page():
             # DIALOG: DELETE CONFIRMATION
             # -------------------------------------------------------------
             def open_delete_dialog(device_id: str, serial_num: str):
-                with ui.dialog() as dialog, ui.card().classes('w-[320px] p-4 flex flex-col gap-3 rounded-xl shadow-xl'):
+                with ui.dialog() as dialog, ui.card().classes('w-full max-w-[320px] p-4 flex flex-col gap-3 rounded-xl shadow-xl mx-2'):
                     ui.label('Delete Device Record').classes('text-base font-bold text-red-600')
                     ui.label(f"Are you sure you want to remove device '{serial_num}'?").classes('text-xs text-slate-600')
 
@@ -244,7 +271,7 @@ def render_admin_devices_page():
 
                     with ui.row().classes('w-full justify-end gap-2 mt-2'):
                         ui.button('Cancel', on_click=dialog.close).props('flat text-color=grey dense')
-                        ui.button('Delete Device', on_click=confirm_delete).classes('bg-red-600 text-white font-bold text-xs px-3 py-1 rounded')
+                        ui.button('Delete Device', on_click=confirm_delete).classes('bg-red-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg')
 
                 dialog.open()
 
