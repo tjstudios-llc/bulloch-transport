@@ -81,7 +81,10 @@ def index_page(request: Request):
         ui.navigate.to('/login')
         return
     render_driver_dashboard(user_role=role)
-
+    
+@app.get("/healthz", status_code=200)
+def health_check():
+    return {"status": "ok"}
 
 # 🚌 Aliases for driver paths -> redirect directly to /driver/maps
 @ui.page('/driver')
