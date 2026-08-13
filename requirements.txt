@@ -9,6 +9,7 @@ firebase-admin>=6.5.0
 psycopg2-binary>=2.9.9
 sqlalchemy>=2.0.28
 google-cloud-firestore
+email-validator>=2.0.0
 # --- HTTP Client & Async API Requests ---
 httpx>=0.27.0
 requests>=2.31.0
