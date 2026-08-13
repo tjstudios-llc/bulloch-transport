@@ -1,0 +1,1 @@
+Plan: build a Flask-based prototype for a bus navigation system with driver and admin dashboards, backed by session-based role handling and simple route/bus state management.
