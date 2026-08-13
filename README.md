@@ -28,7 +28,7 @@ The system operates across a 3-tier architecture connecting bus hardware, cloud 
                                               │
                                               ▼
 [ Driver CarPlay HUD Screen ] <───> [ FastAPI / NiceGUI ] <───> [ Admin Command Center ]
-   (Raspberry Pi 5 Touch)              (App Server)               (Dispatch Web Console)
+   (Raspberry Pi 5 Touch)               (App Server)               (Dispatch Web Console)
 ```
 
 * **Backend Engine:** Powered by FastAPI and Uvicorn, handling API routes (`/api/v1/*`), session middleware, and authentication logic.
