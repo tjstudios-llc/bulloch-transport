@@ -1,5 +1,6 @@
 # app/ui/admin/routes.py
 
+from datetime import datetime
 import inspect
 from nicegui import ui, events
 from app.ui.admin.header import render_admin_header
@@ -11,11 +12,14 @@ from app.services.routes import (
 )
 from app.services.kml_parser import parse_kml_content
 from app.services.geocoding import get_street_name_from_coords
+from app.services.firebase import get_db_reference
+from app.services.settings import get_auto_approve_setting, set_auto_approve_setting
 
 
 def render_admin_routes_page():
     """
     Admin Route Management Console: Refactored for 1024x600 Kiosk Displays.
+    Includes Auto-Approval controls, Pending Requests, and Historical Request Logs.
     """
     current_stops = []
     loaded_polyline = []
@@ -26,10 +30,25 @@ def render_admin_routes_page():
     # Main Kiosk Container (Fixed 540px height prevents outer page scrolling)
     with ui.column().classes('w-full max-w-[1024px] h-[540px] p-2 bg-slate-100 gap-2 overflow-hidden mx-auto'):
         
-        # Compact Tabs Bar
-        with ui.tabs().props('dense active-color=primary').classes('w-full bg-white shadow-sm rounded-lg') as tabs:
-            manage_tab = ui.tab('Route Directory', icon='list_alt')
-            builder_tab = ui.tab('Create / Import Route', icon='add_location_alt')
+        # Compact Tabs Bar + Auto-Approve Toggle Switch
+        with ui.row().classes('w-full justify-between items-center bg-white shadow-sm rounded-lg px-2'):
+            with ui.tabs().props('dense active-color=primary').classes('bg-transparent') as tabs:
+                manage_tab = ui.tab('Route Directory', icon='list_alt')
+                builder_tab = ui.tab('Create / Import Route', icon='add_location_alt')
+                requests_tab = ui.tab('Route Requests', icon='pending_actions')
+                logs_tab = ui.tab('Request Logs', icon='history')
+
+            # Embedded Settings Toggle
+            with ui.row().classes('items-center gap-2 py-1 pr-2'):
+                ui.label('Auto-Approve Requests').classes('text-xs font-bold text-slate-700')
+                initial_toggle = get_auto_approve_setting()
+                
+                def on_toggle_change(e):
+                    set_auto_approve_setting(e.value)
+                    status_str = "ENABLED" if e.value else "DISABLED"
+                    ui.notify(f"Auto-approval {status_str}", type='positive' if e.value else 'warning')
+
+                ui.switch(value=initial_toggle, on_change=on_toggle_change).props('dense color=green')
 
         with ui.tab_panels(tabs, value=manage_tab).classes('w-full flex-1 bg-transparent p-0 overflow-hidden'):
             
@@ -76,7 +95,6 @@ def render_admin_routes_page():
                                     with ui.column().classes('gap-0.5'):
                                         with ui.row().classes('items-center gap-2'):
                                             ui.label(r_name).classes('text-sm font-bold text-slate-900')
-                                            
                                             status_bg = 'bg-green-100 text-green-800' if r_active else 'bg-slate-100 text-slate-600'
                                             ui.label('Active' if r_active else 'Inactive').classes(f'text-[10px] px-1.5 py-0.2 rounded-full font-bold {status_bg}')
 
@@ -92,7 +110,7 @@ def render_admin_routes_page():
                                         ui.button('Edit', on_click=lambda r=route: open_edit_dialog(r)).props('dense color=blue icon=edit').classes('text-xs')
                                         ui.button('Delete', on_click=lambda r_id=r_id, r_name=r_name: open_delete_dialog(r_id, r_name)).props('dense color=red icon=delete').classes('text-xs')
 
-                # --- DIALOG: VIEW ROUTE STOPS & MAP ---
+                # --- DIALOGS ---
                 def open_view_dialog(route: dict):
                     stops = route.get('stops', [])
                     polyline = route.get('path_polyline', [])
@@ -121,7 +139,6 @@ def render_admin_routes_page():
                     
                     dialog.open()
 
-                # --- DIALOG: EDIT ROUTE DETAILS ---
                 def open_edit_dialog(route: dict):
                     with ui.dialog() as dialog, ui.card().classes('w-80 p-4 flex flex-col gap-2 rounded-xl'):
                         ui.label('Edit Route Details').classes('text-sm font-bold text-slate-800')
@@ -154,7 +171,6 @@ def render_admin_routes_page():
 
                     dialog.open()
 
-                # --- DIALOG: DELETE ROUTE CONFIRMATION ---
                 def open_delete_dialog(route_id: str, route_name: str):
                     with ui.dialog() as dialog, ui.card().classes('w-80 p-4 flex flex-col gap-3 rounded-xl'):
                         ui.label('Delete Route').classes('text-sm font-bold text-red-600')
@@ -174,7 +190,6 @@ def render_admin_routes_page():
 
                     dialog.open()
 
-                # Initial render
                 refresh_routes_list()
 
             # =========================================================
@@ -183,78 +198,70 @@ def render_admin_routes_page():
             with ui.tab_panel(builder_tab).classes('p-0 h-full overflow-hidden'):
                 with ui.row().classes('w-full h-full gap-2 items-stretch overflow-hidden'):
                     
-                    # Left Sidebar: Inputs & Upload Form
-                    with ui.card().classes('w-[320px] bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col gap-2 h-full overflow-hidden'):
-                        ui.label('Route Details').classes('text-xs font-bold text-slate-800 uppercase tracking-wider')
-                        
-                        route_name_input = ui.input('Route Name', placeholder='e.g., Route 14A').props('dense outlined').classes('w-full text-xs')
-                        
-                        with ui.row().classes('w-full gap-2'):
-                            bus_number_input = ui.input('Bus #', placeholder='104').props('dense outlined').classes('flex-1')
-                            shift_select = ui.select(['Morning', 'Afternoon', 'Special Event'], value='Morning', label='Shift').props('dense outlined').classes('flex-1')
-                        
-                        driver_name_input = ui.input('Driver Name', placeholder='John Doe').props('dense outlined').classes('w-full')
+                    # Form Sidebar
+                    with ui.card().classes('w-[320px] bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden'):
+                        with ui.column().classes('w-full flex-1 overflow-y-auto gap-2 pr-1'):
+                            ui.label('Route Details').classes('text-xs font-bold text-slate-800 uppercase tracking-wider')
+                            
+                            route_name_input = ui.input('Route Name', placeholder='e.g., Route 14A').props('dense outlined').classes('w-full text-xs')
+                            
+                            with ui.row().classes('w-full gap-2'):
+                                bus_number_input = ui.input('Bus #', placeholder='104').props('dense outlined').classes('flex-1')
+                                shift_select = ui.select(['Morning', 'Afternoon', 'Special Event'], value='Morning', label='Shift').props('dense outlined').classes('flex-1')
+                            
+                            driver_name_input = ui.input('Driver Name', placeholder='John Doe').props('dense outlined').classes('w-full')
 
-                        # KML Upload
-                        ui.label('Import KML Path').classes('text-[11px] font-bold text-slate-700 mt-1')
-                        
-                        async def handle_kml_upload(e: events.UploadEventArguments):
-                            nonlocal loaded_polyline, current_stops
-                            try:
-                                content_stream = getattr(e, 'content', None) or getattr(e, 'file', None)
-                                
-                                if hasattr(content_stream, 'read'):
-                                    read_result = content_stream.read()
-                                    if hasattr(read_result, '__await__'):
-                                        content = await read_result
+                            ui.label('Import KML Path').classes('text-[11px] font-bold text-slate-700 mt-1')
+                            
+                            async def handle_kml_upload(e: events.UploadEventArguments):
+                                nonlocal loaded_polyline, current_stops
+                                try:
+                                    content_stream = getattr(e, 'content', None) or getattr(e, 'file', None)
+                                    if hasattr(content_stream, 'read'):
+                                        read_result = content_stream.read()
+                                        content = await read_result if hasattr(read_result, '__await__') else read_result
                                     else:
-                                        content = read_result
-                                else:
-                                    content = content_stream
+                                        content = content_stream
 
-                                parsed = parse_kml_content(content)
-                                
-                                if parsed.get("name"):
-                                    route_name_input.set_value(parsed["name"])
+                                    parsed = parse_kml_content(content)
+                                    if parsed.get("name"):
+                                        route_name_input.set_value(parsed["name"])
 
-                                current_stops.clear()
-                                current_stops.extend(parsed.get("stops", []))
-                                
-                                loaded_polyline.clear()
-                                loaded_polyline.extend(parsed.get("path_polyline", []))
+                                    current_stops.clear()
+                                    current_stops.extend(parsed.get("stops", []))
+                                    loaded_polyline.clear()
+                                    loaded_polyline.extend(parsed.get("path_polyline", []))
 
-                                refresh_builder_map()
-                                ui.notify(f"Imported {len(current_stops)} stops!", type='positive')
-                            except Exception as err:
-                                ui.notify(f"KML Upload Failed: {err}", type='negative')
+                                    refresh_builder_map()
+                                    ui.notify(f"Imported {len(current_stops)} stops!", type='positive')
+                                except Exception as err:
+                                    ui.notify(f"KML Upload Failed: {err}", type='negative')
 
-                        ui.upload(
-                            label="Choose .kml file",
-                            auto_upload=True,
-                            on_upload=handle_kml_upload
-                        ).props('accept=.kml,.kmz dense outlined').classes('w-full text-xs')
+                            ui.upload(
+                                label="Choose .kml file",
+                                auto_upload=True,
+                                on_upload=handle_kml_upload
+                            ).props('accept=.kml,.kmz dense outlined flat').classes('w-full text-xs max-h-28 overflow-hidden')
 
-                        # Stops Manifest List
-                        ui.label('Stops Manifest').classes('text-[11px] font-bold text-slate-700 mt-1')
-                        stops_container = ui.column().classes('w-full flex-1 overflow-y-auto gap-1 border rounded p-1 bg-slate-50 min-h-[60px]')
+                            ui.label('Stops Manifest').classes('text-[11px] font-bold text-slate-700 mt-1')
+                            stops_container = ui.column().classes('w-full flex-1 overflow-y-auto gap-1 border rounded p-1 bg-slate-50 min-h-[60px]')
 
-                        def render_stops_list():
-                            stops_container.clear()
-                            if not current_stops:
-                                with stops_container:
-                                    ui.label('Click map or upload KML').classes('text-[10px] text-slate-400 italic p-1')
-                                return
+                            def render_stops_list():
+                                stops_container.clear()
+                                if not current_stops:
+                                    with stops_container:
+                                        ui.label('Click map or upload KML').classes('text-[10px] text-slate-400 italic p-1')
+                                    return
 
-                            for idx, stop in enumerate(current_stops, start=1):
-                                street = stop.get('street_name') or f"{stop['lat']:.4f}, {stop['lng']:.4f}"
-                                with stops_container:
-                                    with ui.row().classes('w-full justify-between items-center p-1 bg-white rounded border border-slate-200'):
-                                        ui.label(f"{idx}. {stop['name']}").classes('text-[10px] font-bold text-slate-700')
-                                        ui.label(street).classes('text-[9px] text-slate-500 truncate max-w-[120px]')
+                                for idx, stop in enumerate(current_stops, start=1):
+                                    street = stop.get('street_name') or f"{stop['lat']:.4f}, {stop['lng']:.4f}"
+                                    with stops_container:
+                                        with ui.row().classes('w-full justify-between items-center p-1 bg-white rounded border border-slate-200'):
+                                            ui.label(f"{idx}. {stop['name']}").classes('text-[10px] font-bold text-slate-700')
+                                            ui.label(street).classes('text-[9px] text-slate-500 truncate max-w-[120px]')
 
-                        render_stops_list()
+                            render_stops_list()
 
-                        # Save Action Button
                         def save_route_click():
                             r_name = route_name_input.value.strip() if route_name_input.value else ""
                             b_num = bus_number_input.value.strip() if bus_number_input.value else ""
@@ -290,11 +297,12 @@ def render_admin_routes_page():
                             else:
                                 ui.notify('Failed to save route.', type='negative')
 
-                        ui.button('SAVE ROUTE', on_click=save_route_click).classes(
-                            'w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-8 text-xs rounded-md shadow mt-auto'
-                        )
+                        with ui.row().classes('w-full pt-2 border-t border-slate-200 mt-auto bg-white'):
+                            ui.button('SAVE ROUTE', on_click=save_route_click).classes(
+                                'w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-9 text-xs rounded-md shadow'
+                            )
 
-                    # Right Column: Interactive Map
+                    # Map View
                     with ui.card().classes('flex-1 bg-white p-2 rounded-lg shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden'):
                         ui.label('Interactive Stop & Path Map').classes('text-xs font-bold text-slate-700 mb-1')
                         
@@ -319,7 +327,6 @@ def render_admin_routes_page():
                         async def on_map_click(e):
                             lat = e.args['latlng']['lat']
                             lng = e.args['latlng']['lng']
-                            
                             stop_num = len(current_stops) + 1
                             stop_name = f"Stop #{stop_num}"
                             
@@ -338,3 +345,155 @@ def render_admin_routes_page():
                             refresh_builder_map()
 
                         builder_map.on('click', on_map_click)
+
+            # =========================================================
+            # TAB 3: PENDING ROUTE REQUESTS
+            # =========================================================
+            with ui.tab_panel(requests_tab).classes('p-0 h-full overflow-hidden flex flex-col gap-2'):
+                render_route_requests_panel()
+
+            # =========================================================
+            # TAB 4: REQUEST LOGS (HISTORICAL ARCHIVE)
+            # =========================================================
+            with ui.tab_panel(logs_tab).classes('p-0 h-full overflow-hidden flex flex-col gap-2'):
+                render_request_logs_panel()
+
+
+def render_route_requests_panel():
+    """Renders active (pending) driver route requests."""
+    requests_container = ui.column().classes('w-full flex-1 gap-2 overflow-y-auto pr-1')
+
+    def process_request(request_id: str, new_status: str, req_data: dict):
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            payload = {
+                **req_data,
+                'status': new_status,
+                'processed_at': timestamp,
+                'action_by': 'Admin'
+            }
+            # Update main status
+            get_db_reference(f"route_requests/{request_id}").update(payload)
+            # Log record
+            get_db_reference(f"request_logs/{request_id}").set(payload)
+            
+            ui.notify(f"Request marked as {new_status.upper()} and logged.", type='positive')
+            load_pending_requests()
+        except Exception as err:
+            ui.notify(f"Failed to process request: {err}", type='negative')
+
+    def load_pending_requests():
+        requests_container.clear()
+        
+        try:
+            raw_data = get_db_reference("route_requests").get() or {}
+        except Exception:
+            raw_data = {}
+
+        # Filter only pending requests
+        pending_requests = {k: v for k, v in raw_data.items() if v.get('status', 'pending') == 'pending'}
+
+        # Auto-Approve Check
+        if get_auto_approve_setting() and pending_requests:
+            for req_id, req in list(pending_requests.items()):
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                payload = {
+                    **req,
+                    'status': 'approved',
+                    'processed_at': timestamp,
+                    'action_by': 'Auto-Approve System'
+                }
+                get_db_reference(f"route_requests/{req_id}").update(payload)
+                get_db_reference(f"request_logs/{req_id}").set(payload)
+            pending_requests.clear()
+            ui.notify("Pending requests auto-approved and logged!", type='info')
+
+        if not pending_requests:
+            with requests_container:
+                with ui.card().classes('w-full p-6 text-center bg-white rounded-lg shadow-sm border border-slate-200 mt-2'):
+                    ui.icon('inbox', size='36px').classes('text-slate-300 mb-1 mx-auto')
+                    ui.label('No pending route requests found.').classes('text-xs text-slate-500 font-medium')
+            return
+
+        with requests_container:
+            with ui.row().classes('w-full bg-slate-200 px-3 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 uppercase items-center'):
+                ui.label('Bus #').classes('w-20')
+                ui.label('Message / Request Info').classes('flex-1')
+                ui.label('Status').classes('w-24 text-center')
+                ui.label('Actions').classes('w-36 text-right')
+
+            for req_id, req in reversed(list(pending_requests.items())):
+                bus_num = req.get('bus_number', 'N/A')
+                message = req.get('message', 'No details provided.')
+
+                with ui.card().classes('w-full bg-white p-2 rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 transition-all'):
+                    with ui.row().classes('w-full justify-between items-center gap-2'):
+                        ui.label(f"Bus #{bus_num}").classes('w-20 font-bold text-xs text-blue-900')
+                        ui.label(message).classes('flex-1 text-xs text-slate-700 truncate')
+                        
+                        with ui.row().classes('w-24 justify-center'):
+                            ui.label('PENDING').classes('text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800')
+
+                        with ui.row().classes('w-36 justify-end gap-1'):
+                            ui.button(
+                                'Approve', 
+                                on_click=lambda r_id=req_id, r=req: process_request(r_id, 'approved', r)
+                            ).props('dense color=positive icon=check').classes('text-xs')
+
+                            ui.button(
+                                'Reject', 
+                                on_click=lambda r_id=req_id, r=req: process_request(r_id, 'rejected', r)
+                            ).props('dense color=negative icon=close').classes('text-xs')
+
+    load_pending_requests()
+
+
+def render_request_logs_panel():
+    """Renders processed historical route request logs."""
+    logs_container = ui.column().classes('w-full flex-1 gap-2 overflow-y-auto pr-1')
+
+    def load_logs():
+        logs_container.clear()
+        
+        try:
+            raw_data = get_db_reference("request_logs").get() or {}
+        except Exception:
+            raw_data = {}
+
+        if not raw_data:
+            with logs_container:
+                with ui.card().classes('w-full p-6 text-center bg-white rounded-lg shadow-sm border border-slate-200 mt-2'):
+                    ui.icon('history', size='36px').classes('text-slate-300 mb-1 mx-auto')
+                    ui.label('No processed request logs found.').classes('text-xs text-slate-500 font-medium')
+            return
+
+        with logs_container:
+            # Table Header
+            with ui.row().classes('w-full bg-slate-200 px-3 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 uppercase items-center'):
+                ui.label('Processed Time').classes('w-36')
+                ui.label('Bus #').classes('w-16')
+                ui.label('Message / Request Info').classes('flex-1')
+                ui.label('Processed By').classes('w-32')
+                ui.label('Status').classes('w-24 text-center')
+
+            # Log Items
+            for log_id, log in reversed(list(raw_data.items())):
+                bus_num = log.get('bus_number', 'N/A')
+                message = log.get('message', 'No details provided.')
+                status = log.get('status', 'approved')
+                processed_at = log.get('processed_at', 'N/A')
+                action_by = log.get('action_by', 'System')
+
+                status_bg = 'bg-green-100 text-green-800' if status == 'approved' else 'bg-red-100 text-red-800'
+
+                with ui.card().classes('w-full bg-white p-2 rounded-lg shadow-sm border border-slate-200'):
+                    with ui.row().classes('w-full justify-between items-center gap-2'):
+                        ui.label(processed_at).classes('w-36 text-[10px] text-slate-500 font-mono')
+                        ui.label(f"Bus #{bus_num}").classes('w-16 font-bold text-xs text-slate-800')
+                        ui.label(message).classes('flex-1 text-xs text-slate-600 truncate')
+                        ui.label(action_by).classes('w-32 text-xs text-slate-500 italic')
+                        
+                        with ui.row().classes('w-24 justify-center'):
+                            ui.label(status.upper()).classes(f'text-[10px] px-2 py-0.5 rounded-full font-bold {status_bg}')
+
+    load_logs()

@@ -1,5 +1,7 @@
 # app/services/kml_parser.py
 
+import io
+import zipfile
 import xml.etree.ElementTree as ET
 import logging
 from typing import Dict, Any, List
@@ -10,12 +12,24 @@ logger = logging.getLogger(__name__)
 
 def parse_kml_content(kml_bytes: bytes) -> Dict[str, Any]:
     """
-    Parses a KML file exported from Google Maps or Google My Maps.
+    Parses a KML or KMZ file exported from Google Maps or Google My Maps.
     Extracts route name, stop waypoints, and the strict polyline coordinate path.
+    Handles compressed .kmz archives and UTF-8 BOM characters automatically.
     """
     try:
-        tree = ET.ElementTree(ET.fromstring(kml_bytes))
-        root = tree.getroot()
+        # 1. Handle KMZ (Zip archive) files
+        if kml_bytes.startswith(b'PK'):
+            with zipfile.ZipFile(io.BytesIO(kml_bytes)) as z:
+                kml_files = [f for f in z.namelist() if f.lower().endswith('.kml')]
+                if not kml_files:
+                    raise ValueError("No valid .kml file found inside compressed .kmz archive.")
+                kml_bytes = z.read(kml_files[0])
+
+        # 2. Decode string and strip UTF-8 BOM characters (\xef\xbb\xbf)
+        kml_text = kml_bytes.decode('utf-8-sig').strip()
+
+        # 3. Parse XML Root
+        root = ET.fromstring(kml_text)
 
         # Handle KML XML Namespaces
         namespace = ""
@@ -30,7 +44,8 @@ def parse_kml_content(kml_bytes: bytes) -> Dict[str, Any]:
             route_name = doc_name_node.text.strip()
 
         stops: List[Dict[str, Any]] = []
-        path_polyline: List[List[float]] = []  # List of [lat, lng] pairs
+        # FIRESTORE FIX: Store as List of dicts to avoid 400 Nested Array errors
+        path_polyline: List[Dict[str, float]] = []
 
         placemarks = root.findall(f".//{namespace}Placemark")
 
@@ -62,7 +77,8 @@ def parse_kml_content(kml_bytes: bytes) -> Dict[str, Any]:
                     parts = coord_pair.split(",")
                     if len(parts) >= 2:
                         lng, lat = float(parts[0]), float(parts[1])
-                        path_polyline.append([lat, lng])
+                        # FIRESTORE FIX: Map object instead of nested list [lat, lng]
+                        path_polyline.append({"lat": lat, "lng": lng})
 
         # Mark first stop as current
         if stops:
@@ -78,4 +94,4 @@ def parse_kml_content(kml_bytes: bytes) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Failed to parse KML content: {e}")
-        raise ValueError(f"Invalid or corrupted KML file structure: {e}")
+        raise ValueError(f"Invalid or corrupted KML/KMZ file structure: {e}")

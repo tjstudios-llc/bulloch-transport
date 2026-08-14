@@ -3,6 +3,7 @@
 import logging
 from typing import List, Dict, Any, Optional
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from app.config.firebase import db
 from app.services.geocoding import get_street_name_from_coords
 
@@ -18,7 +19,7 @@ def create_route(
     bus_number: str, 
     shift: str, 
     stops: List[Dict[str, Any]], 
-    path_polyline: Optional[List[List[float]]] = None,
+    path_polyline: Optional[List[Any]] = None,
     assigned_driver: str = "Unassigned"
 ) -> bool:
     """Saves a new route document to Firestore."""
@@ -27,7 +28,7 @@ def create_route(
         for idx, stop in enumerate(stops):
             cleaned_stop = {
                 "name": str(stop.get("name", f"Stop #{idx + 1}")),
-                "street_name": str(stop.get("street_name") or get_street_name_from_coords(stop["lat"], stop["lng"])),
+                "street_name": str(stop.get("street_name") or get_street_name_from_coords(float(stop["lat"]), float(stop["lng"]))),
                 "lat": float(stop["lat"]),
                 "lng": float(stop["lng"]),
                 "status": str(stop.get("status", "current" if idx == 0 else "pending"))
@@ -37,7 +38,16 @@ def create_route(
         cleaned_polyline = []
         if path_polyline:
             for coord in path_polyline:
-                cleaned_polyline.append([float(coord[0]), float(coord[1])])
+                # Safely parse dicts {"lat": ..., "lng": ...} or list/tuples [lat, lng]
+                if isinstance(coord, dict):
+                    lat = float(coord.get("lat", 0.0))
+                    lng = float(coord.get("lng", 0.0))
+                else:
+                    lat = float(coord[0])
+                    lng = float(coord[1])
+                
+                # Store as dict object for Firestore compatibility (No nested arrays)
+                cleaned_polyline.append({"lat": lat, "lng": lng})
 
         route_doc = {
             "name": str(route_name),
@@ -55,7 +65,7 @@ def create_route(
         logger.info(f"Successfully created route '{route_name}'.")
         return True
     except Exception as e:
-        logger.error(f"Error creating route '{route_name}': {e}")
+        logger.exception(f"Error creating route '{route_name}': {e}")
         return False
 
 
@@ -102,13 +112,19 @@ def fetch_active_route_for_bus(bus_number: Optional[str] = None) -> Optional[Dic
         routes_ref = db.collection("routes")
         if bus_number:
             bus_str = str(bus_number)
-            query = routes_ref.where("assigned_bus", "==", bus_str).where("active", "==", True).limit(1).stream()
+            query = (
+                routes_ref
+                .where(filter=FieldFilter("assigned_bus", "==", bus_str))
+                .where(filter=FieldFilter("active", "==", True))
+                .limit(1)
+                .stream()
+            )
             for doc in query:
                 data = doc.to_dict()
                 data["id"] = doc.id
                 return data
 
-        fallback_query = routes_ref.where("active", "==", True).limit(1).stream()
+        fallback_query = routes_ref.where(filter=FieldFilter("active", "==", True)).limit(1).stream()
         for doc in fallback_query:
             data = doc.to_dict()
             data["id"] = doc.id
