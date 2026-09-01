@@ -1,12 +1,10 @@
-# app/ui/auth.py
-
 import json
 import logging
 from nicegui import app, ui
 from app.config.settings import settings
 from app.config.firebase import rtdb
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("bulloch.ui.auth")
 
 
 def render_login_page():
@@ -22,12 +20,15 @@ def render_login_page():
     def sync_device_location(event):
         """Callback triggered from browser JS carrying live GPS coordinates."""
         try:
-            data = event.args
+            data = event.args if hasattr(event, 'args') else event
+            if not isinstance(data, dict):
+                return
+            
             lat = data.get("lat")
             lng = data.get("lng")
             device_id = app.storage.user.get("device_id", "unassigned_device")
 
-            if lat and lng:
+            if lat is not None and lng is not None:
                 # Continuously update device location in Realtime Database
                 rtdb.reference(f"devices/{device_id}").update({
                     "latitude": lat,
@@ -77,27 +78,38 @@ def render_login_page():
         ui.button('Sign in with Google', icon='login').classes(
             'w-full bg-blue-700 hover:bg-blue-600 text-white font-bold py-3 rounded-full shadow transition-all'
         ).on('click', js_handler=f'''
-            () => {{
-                if (!firebase.apps.length) {{
-                    firebase.initializeApp({firebase_cfg});
+            async () => {{
+                try {{
+                    if (!firebase.apps.length) {{
+                        firebase.initializeApp({firebase_cfg});
+                    }}
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    const result = await firebase.auth().signInWithPopup(provider);
+                    const user = result.user;
+                    
+                    // Fetch cryptographic ID token required by FastAPI backend
+                    const idToken = await user.getIdToken(true);
+
+                    const res = await fetch('/api/v1/auth/store-session', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{
+                            idToken: idToken,
+                            name: user.displayName,
+                            email: user.email,
+                            picture: user.photoURL
+                        }})
+                    }});
+
+                    const responseData = await res.json();
+                    if (res.ok) {{
+                        window.location.href = '/';
+                    }} else {{
+                        alert('Sign-In Error: ' + (responseData.detail || 'Authorization failed.'));
+                    }}
+                }} catch (err) {{
+                    alert('Authentication failed: ' + err.message);
                 }}
-                const provider = new firebase.auth.GoogleAuthProvider();
-                firebase.auth().signInWithPopup(provider)
-                    .then((result) => {{
-                        const user = result.user;
-                        fetch('/api/v1/auth/store-session', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify({{
-                                name: user.displayName,
-                                email: user.email,
-                                picture: user.photoURL
-                            }})
-                        }}).then(res => {{
-                            if (res.ok) window.location.href = '/';
-                        }});
-                    }})
-                    .catch((err) => alert('Authentication failed: ' + err.message));
             }}
         ''')
 

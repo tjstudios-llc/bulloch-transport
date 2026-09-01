@@ -10,7 +10,12 @@ from typing import Any, Dict, Optional
 
 from app.config.settings import settings
 
-logger = logging.getLogger("bulloch-transport.tts")
+logger = logging.getLogger("bulloch.services.tts")
+
+# Thread lock for lazy singleton initialization
+_SINGLETON_LOCK = threading.Lock()
+_MAX_QUEUE_SIZE = 20
+_MAX_TEXT_LENGTH = 500
 
 
 class TTSInitializationError(RuntimeError):
@@ -39,12 +44,12 @@ class TTSManager:
         self._rate = max(50, min(rate, 300))
         self._volume = max(0.0, min(volume, 1.0))
         self._engine_choice = engine_choice.lower().strip()
-        self._request_queue: "queue.Queue[_SpeechRequest]" = queue.Queue()
+        self._request_queue: "queue.Queue[_SpeechRequest]" = queue.Queue(maxsize=_MAX_QUEUE_SIZE)
         self._stop_event = threading.Event()
         self._engine: Optional[Any] = None
         self._use_pygame_playback = False
-        self._thread = threading.Thread(target=self._worker_loop, daemon=True, name="TTSManagerThread")
         self._initialization_error: Optional[Exception] = None
+        self._thread = threading.Thread(target=self._worker_loop, daemon=True, name="TTSManagerThread")
         self._thread.start()
 
     def _worker_loop(self) -> None:
@@ -61,20 +66,18 @@ class TTSManager:
             except queue.Empty:
                 continue
 
-            if request.stop_requested:
-                self._stop_playback()
+            try:
+                if request.stop_requested:
+                    self._stop_playback()
+                    continue
+
+                if not request.text.strip():
+                    continue
+
+                self._speak(request.text, request.block)
+            finally:
                 if request.complete_event:
                     request.complete_event.set()
-                continue
-
-            if not request.text.strip():
-                if request.complete_event:
-                    request.complete_event.set()
-                continue
-
-            self._speak(request.text, request.block)
-            if request.complete_event:
-                request.complete_event.set()
 
         self._shutdown_engine()
 
@@ -104,27 +107,21 @@ class TTSManager:
                 logger.warning("pygame playback unavailable: %s; falling back to pyttsx3.", exc)
                 self._use_pygame_playback = False
 
-        logger.debug(
-            "Initialized TTSManager(engine_choice=%s, voice=%s, rate=%s, volume=%s, pygame=%s)",
-            self._engine_choice,
-            self._voice_name,
-            self._rate,
-            self._volume,
-            self._use_pygame_playback,
-        )
-
     def _speak(self, text: str, block: bool) -> None:
         if self._engine is None:
             raise TTSInitializationError("Speech engine is not initialized")
 
+        # Sanitize and truncate text payload
+        clean_text = str(text).strip()[:_MAX_TEXT_LENGTH]
+
         if self._use_pygame_playback:
-            self._speak_with_pygame(text)
+            self._speak_with_pygame(clean_text)
             if block:
                 self._wait_for_pygame()
             return
 
         try:
-            self._engine.say(text)
+            self._engine.say(clean_text)
             self._engine.runAndWait()
         except Exception as exc:
             logger.exception("Error while speaking text: %s", exc)
@@ -141,14 +138,19 @@ class TTSManager:
             import pygame  # type: ignore
 
             sound = pygame.mixer.Sound(str(temp_path))
-            sound.play()
-            while pygame.mixer.get_busy():
-                time.sleep(0.1)
+            channel = sound.play()
+            
+            while pygame.mixer.get_busy() and (channel is None or channel.get_busy()):
+                time.sleep(0.05)
+
         except Exception as exc:
             logger.exception("Error during pygame TTS playback: %s", exc)
         finally:
+            # Safe cleanup after audio handle release
+            time.sleep(0.05)
             try:
-                temp_path.unlink(missing_ok=True)
+                if temp_path.exists():
+                    temp_path.unlink()
             except Exception:
                 logger.debug("Failed to delete temporary TTS file %s", temp_path)
 
@@ -195,13 +197,7 @@ class TTSManager:
         self._engine = None
 
     def speak(self, text: str, block: bool = False, timeout: float = 30.0) -> None:
-        """Queue text for speech playback.
-
-        Args:
-            text: The string to speak.
-            block: If True, wait until speech playback completes.
-            timeout: Maximum seconds to wait when block=True.
-        """
+        """Queue text for speech playback."""
         if self._initialization_error:
             raise self._initialization_error
 
@@ -209,7 +205,11 @@ class TTSManager:
         if block:
             request.complete_event = threading.Event()
 
-        self._request_queue.put(request)
+        try:
+            self._request_queue.put(request, block=False)
+        except queue.Full:
+            logger.warning("TTS request queue full; dropping speech prompt: '%s'", text[:30])
+            return
 
         if block and request.complete_event:
             if not request.complete_event.wait(timeout=timeout):
@@ -220,13 +220,22 @@ class TTSManager:
         self.speak(text, block=False)
 
     def stop(self) -> None:
-        """Stop current speech playback immediately."""
-        self._request_queue.put(_SpeechRequest(text="", block=False, stop_requested=True))
+        """Stop current speech playback immediately and purge queue."""
+        with self._request_queue.mutex:
+            self._request_queue.queue.clear()
+        
+        try:
+            self._request_queue.put_nowait(_SpeechRequest(text="", block=False, stop_requested=True))
+        except queue.Full:
+            pass
 
     def shutdown(self, timeout: float = 5.0) -> None:
         """Shutdown the TTS background thread and release audio resources."""
         self._stop_event.set()
-        self._request_queue.put(_SpeechRequest(text="", block=False))
+        try:
+            self._request_queue.put_nowait(_SpeechRequest(text="", block=False))
+        except queue.Full:
+            pass
         self._thread.join(timeout=timeout)
         if self._thread.is_alive():
             logger.warning("TTSManager thread did not terminate within %s seconds", timeout)
@@ -234,7 +243,8 @@ class TTSManager:
 
 def create_default_tts_manager() -> TTSManager:
     """Create a default TTS manager instance using application settings."""
-    engine_choice = "pygame" if getattr(settings, "ENV", "development") == "production" else "auto"
+    env = str(getattr(settings, "ENV", "development")).lower()
+    engine_choice = "pygame" if env == "production" else "auto"
     return TTSManager(engine_choice=engine_choice)
 
 
@@ -244,14 +254,16 @@ _global_tts_manager: Optional[TTSManager] = None
 
 
 def get_global_tts_manager() -> TTSManager:
-    """Lazy initializer for the global TTSManager instance."""
+    """Thread-safe lazy initializer for global TTSManager instance."""
     global _global_tts_manager
     if _global_tts_manager is None:
-        try:
-            _global_tts_manager = create_default_tts_manager()
-        except Exception as exc:
-            logger.warning("Falling back to basic TTSManager due to initialization error: %s", exc)
-            _global_tts_manager = TTSManager()
+        with _SINGLETON_LOCK:
+            if _global_tts_manager is None:
+                try:
+                    _global_tts_manager = create_default_tts_manager()
+                except Exception as exc:
+                    logger.warning("Falling back to basic TTSManager due to initialization error: %s", exc)
+                    _global_tts_manager = TTSManager()
     return _global_tts_manager
 
 

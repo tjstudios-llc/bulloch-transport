@@ -1,4 +1,12 @@
-from app.middleware.auth import verify_firebase_token, determine_user_role
-from app.middleware.device import verify_device_id
+# app/middleware/auth.py
 
-__all__ = ["verify_firebase_token", "determine_user_role", "verify_device_id"]
+def determine_user_role(decoded_token: dict) -> str:
+    """
+    Determines user role from Firebase custom claims or session data.
+    """
+    if not isinstance(decoded_token, dict):
+        return "driver"
+
+    # Check custom claims or fall back to default role
+    role = decoded_token.get("role") or decoded_token.get("user_role") or "driver"
+    return str(role).lower().strip()

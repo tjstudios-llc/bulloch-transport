@@ -1,70 +1,89 @@
-import os
 import logging
+import os
+import sys
+from typing import Optional
+
 import firebase_admin
-from firebase_admin import credentials, firestore, db as realtime_db
+from firebase_admin import credentials, db as realtime_db, firestore
 from app.config.settings import settings
 
-logger = logging.getLogger("bulloch-transport.firebase")
+logger = logging.getLogger("bulloch.config.firebase")
 
-_firebase_app = None
+_firebase_app: Optional[firebase_admin.App] = None
 
 
 def init_firebase() -> firebase_admin.App:
     """
-    Initializes the Firebase Admin SDK using credentials resolved from settings
-    (Base64 env var, raw JSON string, or local file path).
+    Initializes the Firebase Admin SDK using credentials resolved from settings.
+    Enforces fail-closed credential verification in production environments.
     """
     global _firebase_app
 
-    if _firebase_app or firebase_admin._apps:
+    if firebase_admin._apps:
         _firebase_app = firebase_admin.get_app()
         return _firebase_app
 
     options = {}
+    if getattr(settings, "FIREBASE_PROJECT_ID", None):
+        options["projectId"] = settings.FIREBASE_PROJECT_ID
     if getattr(settings, "FIREBASE_DATABASE_URL", None):
         options["databaseURL"] = settings.FIREBASE_DATABASE_URL
 
     try:
-        # Retrieve resolved credentials (returns a sanitized dict OR a path string)
+        # Retrieve resolved credentials (dict or path string)
         cred_source = settings.firebase_admin_credentials
 
-        # If cred_source is a file path string, ensure the file actually exists
         if isinstance(cred_source, str) and not os.path.exists(cred_source):
-            raise FileNotFoundError(f"Firebase credentials file not found at path '{cred_source}'")
+            raise FileNotFoundError(
+                f"Firebase credentials file not found at path '{cred_source}'"
+            )
 
-        # credentials.Certificate handles both dictionary input and path string input
+        # Initialize Certificate with dictionary or path
         cred = credentials.Certificate(cred_source)
-        _firebase_app = firebase_admin.initialize_app(cred, options if options else None)
+        _firebase_app = firebase_admin.initialize_app(
+            cred, options if options else None
+        )
         logger.info("Firebase Admin SDK initialized successfully.")
+        return _firebase_app
 
     except Exception as e:
+        logger.critical(
+            f"Failed to initialize Firebase Admin SDK with configured credentials: {e}"
+        )
+        if settings.ENV.lower() == "production":
+            sys.stderr.write(
+                f"\n[CRITICAL FIREBASE ERROR] Production credential failure: {e}\n\n"
+            )
+            raise e
+
+        # Fallback to Application Default Credentials (ADC) for local/dev only
         logger.warning(
-            f"Failed to initialize Firebase with configured credentials ({e}). "
-            "Attempting initialization with Application Default Credentials..."
+            "Attempting fallback initialization with Application Default Credentials (Non-Production)..."
         )
         try:
-            _firebase_app = firebase_admin.initialize_app(options=options if options else None)
-            logger.info("Firebase Admin SDK initialized with Application Default Credentials.")
+            _firebase_app = firebase_admin.initialize_app(
+                options=options if options else None
+            )
+            logger.info(
+                "Firebase Admin SDK initialized with Application Default Credentials."
+            )
+            return _firebase_app
         except Exception as fallback_error:
-            logger.error(f"Failed to initialize Firebase Admin SDK: {fallback_error}")
+            logger.critical(
+                f"Failed to initialize Firebase Admin SDK fallback: {fallback_error}"
+            )
             raise fallback_error
 
-    return _firebase_app
 
-
-def get_firestore_db():
-    """
-    Helper function to retrieve the Cloud Firestore client instance.
-    """
+def get_firestore_db() -> firestore.firestore.Client:
+    """Retrieves the Cloud Firestore client instance."""
     if not firebase_admin._apps:
         init_firebase()
     return firestore.client()
 
 
 def get_db_reference(path: str = "/"):
-    """
-    Helper function to retrieve a Firebase Realtime Database reference.
-    """
+    """Retrieves a Firebase Realtime Database reference."""
     if not firebase_admin._apps:
         init_firebase()
     return realtime_db.reference(path)
@@ -73,8 +92,6 @@ def get_db_reference(path: str = "/"):
 # Ensure SDK initialization on import
 init_firebase()
 
-# Export Realtime Database module reference for services (e.g., rtdb.reference(...))
+# Module exports
 rtdb = realtime_db
-
-# Export Firestore instance for backward compatibility across other services
 db = get_firestore_db()
