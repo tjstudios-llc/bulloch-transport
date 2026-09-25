@@ -1,0 +1,443 @@
+BULLOCH TRANSPORT
+
+SOFTWARE LICENSE AGREEMENT
+
+Version: 1.0
+Effective Date: ____________________
+
+LICENSOR
+
+TJ Studios LLC
+Doing business as Bulloch Transport
+Address: __________________________________________
+Email: ____________________________________________
+
+LICENSEE
+
+Bulloch County Schools
+Address: __________________________________________
+Authorized Representative: __________________________
+
+⸻
+
+1. PURPOSE
+
+This Software License Agreement (“License”) governs the use of the Bulloch Transport software and related technology provided by TJ Studios LLC (“Licensor”) to Bulloch County Schools (“Licensee”).
+
+The purpose of this License is to permit Licensee to use the software for authorized school transportation operations while establishing the ownership, use, modification, distribution, and maintenance rights associated with the software.
+
+⸻
+
+2. DEFINITIONS
+
+2.1 “Software”
+
+“Software” means the Bulloch Transport software developed, maintained, or provided by Licensor, including applicable:
+
+* application software;
+* Raspberry Pi software;
+* device-management software;
+* navigation software;
+* user interfaces;
+* APIs;
+* backend services;
+* administrative dashboards;
+* update systems;
+* deployment tools;
+* scripts;
+* configuration systems;
+* documentation;
+* custom graphics and interfaces;
+* security components; and
+* related software components created by Licensor.
+
+2.2 “Authorized Device”
+
+An “Authorized Device” means a Raspberry Pi, computer, server, touchscreen system, or other hardware specifically approved for use with Bulloch Transport.
+
+2.3 “Update”
+
+An “Update” means a software update, security patch, bug fix, feature update, configuration update, firmware update, dependency update, or other modification supplied by Licensor.
+
+2.4 “School Data”
+
+“School Data” means information supplied by or belonging to Licensee that is processed through the Software.
+
+⸻
+
+3. COPYRIGHT OWNERSHIP
+
+Except for third-party software and materials, Licensor retains all right, title, and interest in the Software and its original components.
+
+This includes applicable copyrights, source code, object code, software architecture, interfaces, documentation, designs, algorithms, deployment systems, and other original works.
+
+Nothing in this License transfers ownership of the Software to Licensee.
+
+⸻
+
+4. LICENSE GRANT
+
+Subject to the terms of this License, Licensor grants Licensee a:
+
+non-exclusive, limited, non-transferable license
+
+to install, execute, display, and use the Software on Authorized Devices for the internal transportation and operational purposes of Bulloch County Schools.
+
+The license is limited to the authorized Bulloch Transport environment.
+
+⸻
+
+5. AUTHORIZED USE
+
+Licensee may use the Software to:
+
+* operate school transportation systems;
+* operate authorized bus Devices;
+* manage transportation routes;
+* support authorized drivers;
+* monitor authorized transportation operations;
+* perform administrative transportation functions;
+* perform authorized maintenance;
+* access authorized dashboards;
+* receive Software Updates; and
+* use other features provided by the Software.
+
+⸻
+
+6. INSTALLATION
+
+Licensee may install the Software on Authorized Devices designated for Bulloch Transport.
+
+Licensee shall not intentionally install the Software on unauthorized systems or distribute installation packages to unauthorized parties.
+
+⸻
+
+7. SOFTWARE UPDATES
+
+Licensee authorizes Licensor to provide Updates to Authorized Devices.
+
+Updates may include:
+
+* application updates;
+* security patches;
+* operating-system updates;
+* dependency updates;
+* firmware updates;
+* configuration updates;
+* performance improvements;
+* bug fixes;
+* navigation improvements;
+* device-management improvements; and
+* emergency security updates.
+
+Updates may be delivered automatically or manually.
+
+⸻
+
+8. REMOTE ADMINISTRATION
+
+As part of maintaining the Software, Licensee may authorize Licensor to remotely administer Authorized Devices.
+
+Remote administration may use technologies including:
+
+* Tailscale;
+* SSH;
+* authenticated management services;
+* secure APIs;
+* device-management agents; and
+* other security-approved mechanisms.
+
+Remote administration is limited to Authorized Devices and legitimate Software maintenance, security, troubleshooting, and support purposes.
+
+Additional remote-access terms may be established in a separate Device Management & Remote Access Agreement.
+
+⸻
+
+9. MODIFICATION BY LICENSEE
+
+Licensee may configure the Software using configuration options intentionally provided by Licensor.
+
+Licensee may not modify proprietary portions of the Software unless expressly authorized in writing by Licensor.
+
+Nothing in this section restricts rights that Licensee has under applicable law.
+
+⸻
+
+10. SOURCE CODE
+
+Unless separately agreed in writing, this License does not grant Licensee ownership of or unrestricted access to the Software’s source code.
+
+Providing source code for development, auditing, maintenance, security review, or another authorized purpose does not transfer copyright ownership.
+
+⸻
+
+11. REDISTRIBUTION
+
+Licensee may not sell, sublicense, publish, redistribute, lease, rent, or otherwise provide the Software to an unauthorized third party.
+
+Licensee may not create a separate commercial software product based substantially on the Software without a separate written agreement with Licensor.
+
+⸻
+
+12. REVERSE ENGINEERING
+
+Licensee shall not reverse engineer, decompile, disassemble, or otherwise attempt to derive the source code or underlying structure of proprietary portions of the Software except to the extent such activity cannot legally be restricted under applicable law.
+
+⸻
+
+13. THIRD-PARTY SOFTWARE
+
+The Software may contain or interact with third-party software, open-source software, operating systems, libraries, APIs, or services.
+
+Third-party components remain owned by their respective authors or licensors.
+
+Those components are governed by their applicable licenses.
+
+Where a third-party license grants rights that cannot be restricted by this License, those rights remain unaffected.
+
+⸻
+
+14. SCHOOL DATA
+
+Licensee retains ownership of its School Data.
+
+Nothing in this License transfers ownership of School Data to Licensor.
+
+Licensor may process or access School Data only as reasonably necessary to provide, maintain, secure, troubleshoot, update, or support the Software, subject to applicable law and any applicable data-protection agreement.
+
+⸻
+
+15. DATA SECURITY
+
+Licensor shall use reasonable technical and organizational safeguards appropriate to the Software and its intended use.
+
+Security measures may include:
+
+* authentication;
+* authorization;
+* encryption;
+* access controls;
+* Tailscale network controls;
+* SSH authentication;
+* device identity;
+* logging;
+* credential management;
+* security updates; and
+* vulnerability remediation.
+
+⸻
+
+16. SECURITY UPDATES
+
+Licensor may deploy emergency security Updates when reasonably necessary to address a significant vulnerability, active security threat, or critical system failure.
+
+Emergency Updates may be deployed outside scheduled maintenance periods when reasonably necessary to protect Authorized Devices or the Software environment.
+
+⸻
+
+17. MAINTENANCE WINDOW
+
+Routine Updates may be scheduled during an agreed maintenance window.
+
+The intended maintenance window is:
+
+9:00 PM Eastern Time
+
+The maintenance window may be changed by mutual agreement.
+
+Emergency security maintenance may occur outside the scheduled window when reasonably necessary.
+
+⸻
+
+18. AVAILABILITY
+
+Licensor will make reasonable efforts to maintain the Software.
+
+However, Licensee acknowledges that system availability may depend on:
+
+* Internet connectivity;
+* cellular connectivity;
+* power;
+* Raspberry Pi hardware;
+* third-party services;
+* cloud infrastructure;
+* mapping services;
+* weather services;
+* authentication providers;
+* network infrastructure; and
+* other external systems.
+
+Licensor does not guarantee uninterrupted operation of every component.
+
+⸻
+
+19. LICENSE TERM
+
+This License begins on the Effective Date and continues until terminated according to this Agreement or another written agreement between the Parties.
+
+⸻
+
+20. TERMINATION
+
+Licensor may terminate this License if Licensee materially violates the terms of this License and fails to remedy the violation within a reasonable period after receiving written notice.
+
+Licensee may terminate its use of the Software at any time by providing written notice.
+
+Termination does not transfer ownership of the Software.
+
+⸻
+
+21. EFFECT OF TERMINATION
+
+Upon termination, Licensee shall cease using the Software except where continued use is required by applicable law or expressly authorized in writing.
+
+Where technically appropriate, Licensor may revoke Software licenses, credentials, remote-access permissions, or management access associated with the terminated deployment.
+
+⸻
+
+22. INTELLECTUAL PROPERTY
+
+Licensee acknowledges that the Software and its original components constitute intellectual property of Licensor or the applicable third-party rights holders.
+
+Licensee shall not intentionally remove copyright notices, license notices, or other ownership notices from the Software.
+
+⸻
+
+23. IMPROVEMENTS AND UPDATES
+
+Unless otherwise agreed in writing, improvements, Updates, modifications, enhancements, and derivative works created by Licensor remain the property of Licensor to the extent permitted by applicable law.
+
+Licensee receives the right to use such Updates under this License.
+
+⸻
+
+24. CONFIDENTIAL INFORMATION
+
+Each Party may receive confidential technical, operational, security, or business information belonging to the other Party.
+
+Each Party shall use reasonable measures to protect confidential information from unauthorized disclosure.
+
+Confidential information does not include information that:
+
+* is publicly available without breach of this License;
+* was already lawfully known;
+* is independently developed without use of confidential information; or
+* must be disclosed by law or lawful governmental order.
+
+⸻
+
+25. SECURITY CREDENTIALS
+
+Authentication credentials, SSH keys, Tailscale credentials, API keys, certificates, tokens, and other security credentials used by the Software shall be protected against unauthorized access.
+
+Compromised credentials should be revoked or rotated as soon as reasonably practical.
+
+⸻
+
+26. NO UNAUTHORIZED ACCESS
+
+This License does not authorize either Party to access systems outside the authorized Bulloch Transport environment.
+
+Authorization granted under this License applies only to systems and Devices necessary to operate, maintain, secure, and support Bulloch Transport.
+
+⸻
+
+27. COMPLIANCE WITH LAW
+
+Each Party shall use the Software in accordance with applicable federal, state, and local laws and regulations.
+
+Nothing in this License authorizes either Party to violate applicable law.
+
+⸻
+
+28. DISCLAIMER
+
+Except where otherwise expressly agreed in writing, the Software is provided subject to the terms of this License.
+
+Licensor does not guarantee that the Software will be completely free of errors or interruptions.
+
+Nothing in this section excludes or limits rights or obligations that cannot legally be excluded or limited.
+
+⸻
+
+29. LIMITATION OF LIABILITY
+
+To the extent permitted by applicable law, the Parties’ liability under this License shall be limited to damages directly arising from a material breach of this License.
+
+Nothing in this section limits liability that cannot legally be limited.
+
+Any additional limitation of liability, indemnification, insurance, or governmental contracting requirements should be addressed in a separate agreement reviewed by qualified legal counsel.
+
+⸻
+
+30. GOVERNING LAW
+
+This License shall be governed by applicable law in the jurisdiction specified by the Parties’ underlying agreement, without regard to conflict-of-law principles, except where applicable law requires otherwise.
+
+⸻
+
+31. ASSIGNMENT
+
+Licensee may not transfer or assign this License to another organization without the prior written consent of Licensor, except where such restriction is prohibited by applicable law.
+
+⸻
+
+32. AMENDMENTS
+
+Changes to this License must be made in writing and approved by authorized representatives of the Parties.
+
+⸻
+
+33. SEVERABILITY
+
+If any provision of this License is determined to be unenforceable, the remaining provisions shall remain effective to the extent permitted by law.
+
+⸻
+
+34. ENTIRE AGREEMENT
+
+This License constitutes the agreement between the Parties concerning the licensing of the Bulloch Transport Software and supersedes prior written or oral understandings concerning the same subject matter, except for separately executed agreements that expressly remain in effect.
+
+⸻
+
+35. ELECTRONIC SIGNATURES
+
+The Parties may execute this License electronically to the extent permitted by applicable law.
+
+Electronic records and signatures may be used to evidence acceptance of this License.
+
+⸻
+
+36. SIGNATURES
+
+LICENSOR
+
+TJ Studios LLC
+
+Authorized Representative:
+
+⸻
+
+Name: __________________________________
+
+Title: ___________________________________
+
+Signature: _______________________________
+
+Date: ___________________________________
+
+LICENSEE
+
+Bulloch County Schools
+
+Authorized Representative:
+
+⸻
+
+Name: __________________________________
+
+Title: ___________________________________
+
+Signature: _______________________________
+
+Date: ___________________________________
